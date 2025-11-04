@@ -19,14 +19,16 @@ class RenderingContext {
   final LibOpenGLES gl;
   final int width;
   final int height;
+  final bool checkGlErrorOnEveryCall;
 
-  RenderingContext.create(this.gl, this.width, this.height);
+  RenderingContext.create(this.gl, this.width, this.height, [this.checkGlErrorOnEveryCall = false]);
 
   /// As allocating and freeing native memory is expensive and we need regularly
   /// buffers to receive values from FFI function we create a small set here that will
   /// be reused constantly
   /// 
   void checkError([String message = '']) {
+    if(!checkGlErrorOnEveryCall) return;
     final glError = gl.glGetError();
     if (glError != WebGL.NO_ERROR) {
       final openGLException = OpenGLException('RenderingContext.$message', glError);
@@ -35,6 +37,7 @@ class RenderingContext {
   }
 
   void startCheck(String type){
+    if(!checkGlErrorOnEveryCall) return;
     angleConsole.info('Start: $type');
   }
 

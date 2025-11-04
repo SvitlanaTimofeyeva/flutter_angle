@@ -16,12 +16,14 @@ class RenderingContext{
   dynamic _gl;
   final int width;
   final int height;
+  final bool checkGlErrorOnEveryCall;
 
-  RenderingContext.create(this.gl, this.width, this.height){
+  RenderingContext.create(this.gl, this.width, this.height,[this.checkGlErrorOnEveryCall = false]){
     _gl = gl.gl;
   }
 
   void checkError([String message = '']) {
+    if(!checkGlErrorOnEveryCall) return;
     final glError = glGetError(_gl, );
     if (glError != WebGL.NO_ERROR) {
       final openGLException = OpenGLException('RenderingContext.$message', glError);
@@ -29,6 +31,7 @@ class RenderingContext{
     }
   }
   void startCheck(String type){
+    if(!checkGlErrorOnEveryCall) return;
     angleConsole.info('Start: $type');
   }
 

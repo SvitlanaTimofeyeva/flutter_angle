@@ -2,6 +2,14 @@ cmake_minimum_required(VERSION 3.31.4)
 
 project(angle_android_graphic_jni)
 
+if (NOT ANDROID_ABI)
+    set(ANDROID_ABI arm64-v8a)
+endif()
+
+if (NOT ANDROID_ABI STREQUAL "arm64-v8a")
+    message(FATAL_ERROR "flutter_angle: only arm64-v8a is supported (got ${ANDROID_ABI})")
+endif()
+
 # Find required Android libraries
 find_library(log-lib log)
 find_library(android-lib android)

@@ -178,11 +178,44 @@ public class FlutterAnglePlugin implements FlutterPlugin, MethodCallHandler {
       case "resizeTexture":
         changeSize(call, result);
         break;
+      case "resetOpenGLAngle":
+        try {
+          deinit(); // native ANGLE deinit()
+          Log.i(TAG, "ANGLE deinit() called from resetOpenGLAngle");
+          result.success(null);
+        } catch (Exception e) {
+          Log.e(TAG, "resetOpenGLAngle failed", e);
+          result.error("ANGLE_RESET_FAILED", e.getMessage(), null);
+        }
+        break;
+      case "deleteTexture":
+         deleteTextureImplementation(call, result);
+         break;
       default:
         result.notImplemented();
         break;
     }
   }
+
+    private void deleteTextureImplementation(MethodCall call, MethodChannel.Result result) {
+    @SuppressWarnings("unchecked")
+    Map<String, Object> args = (Map<String, Object>) call.arguments;
+    int textureId = (int) args.get("textureId");
+
+    Long key = Long.valueOf(textureId);
+    FlutterGLTexture tex = flutterTextureMap.remove(key);
+
+    if (tex != null) {
+      try {
+        tex.dispose(); // this runs on plugin/engine thread → OK for Flutter JNI
+      } catch (Throwable e) {
+        Log.e(TAG, "Error disposing texture with id " + textureId, e);
+      }
+    }
+
+    result.success(null);
+  }
+
 
   @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
   private void initOpenGLImplementation(MethodChannel.Result result) {
@@ -335,22 +368,24 @@ public class FlutterAnglePlugin implements FlutterPlugin, MethodCallHandler {
     }
   }
 
-  @Override
-  public void onDetachedFromEngine(@NonNull FlutterPlugin.FlutterPluginBinding binding) {
-    channel.setMethodCallHandler(null);
-    // Dispose Plugin1 textures
-    for (FlutterGLTexture texture : flutterTextureMap.values()) {
-      try {
-        texture.finalize();
-      } catch (Throwable e) {
-        Log.e(TAG, "Error disposing Flutter texture", e);
-      }
-    }
-    flutterTextureMap.clear();
+@Override
+public void onDetachedFromEngine(@NonNull FlutterPlugin.FlutterPluginBinding binding) {
+  channel.setMethodCallHandler(null);
 
-    // Deinitialize native ANGLE resources
-    deinit();
+  // Dispose Plugin1/Plugin2 textures explicitly on the engine thread.
+  for (FlutterGLTexture texture : flutterTextureMap.values()) {
+    try {
+      texture.dispose();
+    } catch (Throwable e) {
+      Log.e(TAG, "Error disposing Flutter texture", e);
+    }
   }
+  flutterTextureMap.clear();
+
+  // Deinitialize native ANGLE resources
+  deinit();
+}
+
 
   // --- Native methods (used for ANGLE calls) ---
   private static native boolean init();
@@ -471,10 +506,12 @@ public class FlutterAnglePlugin implements FlutterPlugin, MethodCallHandler {
 
     @Override
     protected void finalize() throws Throwable {
-      dispose();
+      // Do NOT call dispose() here.
+      // Finalizer runs on a background thread, but texture release must
+      // happen on the Flutter UI thread, otherwise FlutterJNI explodes.
+      Log.w(FlutterAnglePlugin.TAG, "FlutterGLTexture finalized without explicit dispose()");
       super.finalize();
     }
-
     public long getTextureId() {
       return usingSurfaceProducer ? surfaceProducer.id() : surfaceTextureEntry.id();
     }

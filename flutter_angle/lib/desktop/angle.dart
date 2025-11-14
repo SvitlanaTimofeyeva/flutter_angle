@@ -727,6 +727,22 @@ class FlutterAngle {
           .invokeMethod('deleteTexture', {"textureId": texture.textureId});
   }
 
+  Future<void> resetAngle() async {
+    if (!Platform.isAndroid || !_useAngle) return;
+
+    // Tell native side to drop its EGL state
+    await _channel.invokeMethod('resetOpenGLAngle');
+
+    // Drop Dart-side EGL state so next init() is a full fresh init
+    _display = nullptr;
+    _baseAppContext = nullptr;
+    _pluginContext = nullptr;
+    _dummySurface = nullptr;
+    _libEGL = null;
+    _activeFramebuffer = null;
+    _currentTextureId = null;
+  }
+
   void dispose([List<FlutterAngleTexture?>? textures]) {
     textures?.forEach((t) {
       if (t != null) deleteTexture(t);
